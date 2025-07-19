@@ -1,8 +1,8 @@
 setting = input().strip().split()
 n = int(setting[0])
 m = int(setting[1])
-
-print(f'n: {n}, m: {m}')
+outputs = []
+#print(f'n: {n}, m: {m}')
 
 def check_setting(n, m):
     if 1 <= n and 0 <= m < 1000:
@@ -20,7 +20,7 @@ def read_message(n,m):
         b = int(message[1])
         c = int(message[2])
         if not (1 <= a <= n ) or not (1 <= b <= n) or not (0 <= c <= 1):
-            print('da pian zi')
+            outputs.append('da pian zi')
             break
         #print(f'message: {message}')
         if c == 0:
@@ -41,17 +41,15 @@ def read_message(n,m):
             team = False
             for set_curr in sets:
                 if a in set_curr and b in set_curr:
-                    print('we are a team')
+                    outputs.append('we are a team')
                     team = True
                     break
             if not team:
-                print('we are not a team')
+                outputs.append('we are not a team')
         i += 1
-    print(f'sets: {sets}')
+    #print(f'sets: {sets}')
     return
-
-
-
 
 if check_setting(n,m):
     read_message(n,m)
+    print("\n".join(outputs))
