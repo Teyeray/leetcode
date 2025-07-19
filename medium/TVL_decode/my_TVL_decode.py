@@ -1,11 +1,10 @@
 import sys
 
 lines = []
-# for line in sys.stdin:
-#     line = line.strip().split()
-#     lines.append(line)
-lines = [['31'], ['32', '01', '00', 'AE', '90', '02', '00', '01', '02', '30', '03', '00', 'AB', '32', '31', '31', '02', '00', '32', '33', '33', '01', '00', 'CC']]
-
+for line in sys.stdin:
+    line = line.strip().split()
+    lines.append(line)
+#lines = [['31'], ['32', '01', '00', 'AE', '90', '02', '00', '01', '02', '30', '03', '00', 'AB', '32', '31', '31', '02', '00', '32', '33', '33', '01', '00', 'CC']]
 tag = lines.pop(0)[0]
 lines = [x for x in lines[0]]
 
