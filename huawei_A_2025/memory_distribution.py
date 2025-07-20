@@ -10,11 +10,10 @@ def allocate_memory(memory_pool, request):
         i += 1
     return False
 
-memory_pool = input().strip().split(",")
+memory_pool = sorted([list(map(int, item.split(":"))) for item in input().strip().split(",")], key=lambda x: x[0])
 request_list = input().strip().split(",")
 request_list = [int(x) for x in request_list]
-enumerated_memory = [tuple(map(int, item.split(':'))) for item in memory_pool]
-memory_pool = sorted([[size, count] for size, count in enumerated_memory], key=lambda x: x[0])
+
 
 
 output = []
