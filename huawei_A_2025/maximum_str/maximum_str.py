@@ -1,15 +1,25 @@
 nums = input().strip().split()
 nums = [int(x) for x in nums]
 print(f'nums:{nums}')
+
+def compare(x,y):
+    x = str(x)
+    y = str(y)
+    if x+y > y+x:
+        return -1
+    elif x+y < y+x:
+        return 1
+    else:
+        return 0
 def largestNumber(nums):
-    dp = [num for num in nums]
-    for i in range(1,len(nums)):
-        for j in range(len(nums)-1,_ ,-1):
-            a = int(str(dp[j-1])+str(nums[j]))
-            b = int(str(nums[j])+str(dp[j-1]))
-            print(f'\nin i:{i}, j:{j}, dp: {dp}, a: {a}, b: {b}')
-            dp[j] = max(int(dp[j]), max(a,b))
-            print(f'dp_calculated: {dp}\n')
-    return str(max(dp))
-    
+    n = len(nums)
+    for i in range(n):
+        for j in range(i+1,n):
+            k = compare(nums[i],nums[j])
+            print(f'k={k}')
+            if k == 1:
+                temp = nums[i]
+                nums[i] = nums[j]
+                nums[j] = temp
+    return(nums)
 print(largestNumber(nums))
