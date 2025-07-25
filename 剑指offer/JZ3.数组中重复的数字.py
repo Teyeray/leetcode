@@ -15,5 +15,14 @@
 class Solution:
     def duplicate(self , numbers: List[int]) -> int:
         # write code here
-
+        deduplicated = {}
+        repeat = 0
+        for num in numbers:
+            if not str(num).isdigit():
+                return -1
+            if num not in deduplicated:
+                deduplicated[num] = 1
+            else:
+                return num
+        return -1
 # @nc code=end
