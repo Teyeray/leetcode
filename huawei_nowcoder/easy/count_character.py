@@ -12,6 +12,14 @@
 
 输出描述：
 在一行上输出一个整数，代表统计结果。
+
+
+HELLONowcoder123
+o
+
+
+H E L L O Nowcoder123
+1
 '''
 import sys
 
@@ -21,7 +29,7 @@ for line in sys.stdin:
     line = line.strip()
     words.extend(line.split())
 last_char = words[-1].lower()
-#print(f'lines: {words}]\n')
+print(f'lines: {words}]\n')
 for line in words[:-1]:
     #print(f'\nline:{line}\n')
     #print(f'line.split: {line.split()}\n')
