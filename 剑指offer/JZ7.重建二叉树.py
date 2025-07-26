@@ -21,5 +21,16 @@
 class Solution:
     def reConstructBinaryTree(self , preOrder: List[int], vinOrder: List[int]) -> TreeNode:
         # write code here
+        if not preOrder:
+            return None
+        root_val = preOrder[0]
+        root = TreeNode(root_val)
+        idx = vinOrder.index(root_val)
+
+        root.left = self.reConstructBinaryTree(preOrder[1 : 1 + idx], vinOrder[0 : idx])
+        root.right = self.reConstructBinaryTree(preOrder[1 + idx :], vinOrder[idx + 1 :])
+        return root
+
+
         
 # @nc code=end
