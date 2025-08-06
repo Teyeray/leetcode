@@ -15,6 +15,7 @@
 class Solution:
     def NumberOf1(self , n: int) -> int:
         # write code here
-        
+        a = bin(n & 0xFFFFFFFF)
+        return a.count('1')
 
 # @nc code=end
