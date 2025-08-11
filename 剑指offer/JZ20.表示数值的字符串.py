@@ -15,5 +15,5 @@
 class Solution:
     def isNumeric(self , str ):
         # write code here
-
+    
 # @nc code=end
