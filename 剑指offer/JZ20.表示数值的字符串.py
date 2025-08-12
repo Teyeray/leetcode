@@ -14,6 +14,30 @@
 #
 class Solution:
     def isNumeric(self , str ):
-        # write code here
-    
+        str = str.strip().lower()
+        def is_decimal(s: str) -> bool:
+            if not s:
+                return False
+            if s[0] == '+' or s[0] == '-':
+                s = s[1:]
+            idx = s.find('.')
+            if idx == -1:
+                return False
+            if s[:idx] and s[idx + 1:]:
+                return s[:idx].isdigit() and s[idx + 1:].isdigit()
+            else:
+                return s[:idx].isdigit() or s[idx + 1:].isdigit()
+        def is_int(s: str) -> bool:
+            if not s:
+                return False
+            if s[0] == '+' or s[0] == '-':
+                s = s[1:]
+            return s.isdigit()
+        def is_scientific(s: str) -> bool:
+            if 'e' in s:
+                base, exp = s.split('e', 1)
+                return (is_int(base) or is_decimal(base)) and is_int(exp)
+            else:
+                return is_int(s) or is_decimal(s)
+        return is_scientific(str)
 # @nc code=end
