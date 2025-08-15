@@ -19,5 +19,13 @@
 class Solution:
     def ReverseList(self , head: ListNode) -> ListNode:
         # write code here
+        prev = None
+        curr = head
+        while curr:
+            next_node = curr.next
+            curr.next = prev
+            prev = curr
+            curr = next_node
+        return prev
 
 # @nc code=end
