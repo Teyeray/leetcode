@@ -20,5 +20,13 @@
 class Solution:
     def Mirror(self , pRoot: TreeNode) -> TreeNode:
         # write code here
-
+        def exchange(Node: TreeNode):
+            if Node == None:
+                return
+            Node.left, Node.right = Node.right, Node.left
+            exchange(Node.left)
+            exchange(Node.right)
+            return
+        exchange(pRoot)
+        return pRoot
 # @nc code=end
