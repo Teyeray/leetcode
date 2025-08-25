@@ -20,13 +20,13 @@
 class Solution:
     def Mirror(self , pRoot: TreeNode) -> TreeNode:
         # write code here
-        def exchange(Node: TreeNode):
-            if Node == None:
+        def do_mirror(curr_node: TreeNode):
+            if not curr_node:
                 return
-            Node.left, Node.right = Node.right, Node.left
-            exchange(Node.left)
-            exchange(Node.right)
-            return
-        exchange(pRoot)
+            curr_node.left, curr_node.right = curr_node.right, curr_node.left
+            do_mirror(curr_node.left)
+            do_mirror(curr_node.right)
+        do_mirror(pRoot)
         return pRoot
+
 # @nc code=end
