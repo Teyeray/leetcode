@@ -21,5 +21,23 @@
 class Solution:
     def FindPath(self , root: TreeNode, target: int) -> List[List[int]]:
         # write code here
+        res = []
+        def backtrack(node, path, path_sum):
+            if not node:
+                return
+            
+            path.append(node.val)
+            path_sum += node.val
 
+            if not node.left and not node.right and path_sum == target:
+                res.append(path[:])
+            
+            backtrack(node.left, path, path_sum)
+            backtrack(node.right, path, path_sum)
+
+            path.pop()
+        backtrack(root, [], 0)
+        return res
+            
+            
 # @nc code=end
