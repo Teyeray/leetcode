@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HKAI-PV | RandomForest Predictor</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-deep:      #030d1f;
+      --bg-panel:     #061428;
+      --bg-card:      #0a1e38;
+      --bg-card2:     #0d2444;
+      --border:       rgba(0, 168, 255, 0.22);
+      --border-glow:  rgba(0, 168, 255, 0.55);
+      --accent:       #00a8ff;
+      --accent2:      #00e5ff;
+      --accent3:      #7b61ff;
+      --warn:         #ffd600;
+      --danger:       #ff4757;
+      --success:      #00e676;
+      --text-primary: #e8f4ff;
+      --text-sec:     #7ab3d4;
+      --text-dim:     #4a7a9b;
+      --font: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+    }
+
+    html, body { width: 100%; height: 100%; background: var(--bg-deep); color: var(--text-primary); font-family: var(--font); overflow: hidden; }
+    .app { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
+
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 28px; height: 52px;
+      background: rgba(6,20,40,0.97);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0; z-index: 10;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 20px; }
+    .catl-logo { display: flex; align-items: center; gap: 10px; }
+    .catl-logo-text { font-size: 13px; font-weight: 700; letter-spacing: 2px; color: #fff; }
+    .catl-logo-sub  { font-size: 10px; color: var(--text-sec); letter-spacing: 1px; }
+    .logo-divider   { width: 1px; height: 28px; background: var(--border); }
+    .system-name-main { font-size: 16px; font-weight: 700; color: #ffe066; letter-spacing: 1px; }
+    .system-name-sub  { font-size: 10px; color: var(--text-sec); letter-spacing: 0.5px; }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+    .status-badge {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 12px; background: rgba(0,229,255,0.07);
+      border: 1px solid rgba(0,229,255,0.28); border-radius: 20px;
+      font-size: 11px; color: var(--accent2);
+    }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #00e676; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .topbar-tag { font-size: 11px; color: var(--text-dim); padding: 3px 10px; border: 1px solid var(--border); border-radius: 4px; }
+
+    .main { display: flex; flex: 1; overflow: hidden; }
+
+    .left-panel {
+      width: 264px; flex-shrink: 0;
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: 16px 0 12px; overflow-y: auto;
+    }
+    .panel-section-title {
+      font-size: 10px; font-weight: 700; color: var(--text-dim);
+      letter-spacing: 2px; text-transform: uppercase;
+      padding: 0 16px 10px; border-bottom: 1px solid var(--border); margin-bottom: 12px;
+    }
+    .panel-hint {
+      font-size: 10px; color: var(--text-dim); padding: 0 16px 10px;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .hint-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+    .stage-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; cursor: pointer;
+      border-left: 3px solid transparent;
+      transition: all 0.2s; position: relative;
+    }
+    .stage-item:hover { background: rgba(0,168,255,0.05); }
+    .stage-item.active { background: rgba(0,168,255,0.08); border-left-color: var(--accent); }
+    .stage-color-bar { width: 4px; height: 32px; border-radius: 2px; flex-shrink: 0; }
+    .stage-icon {
+      width: 36px; height: 36px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .stage-info { flex: 1; min-width: 0; }
+    .stage-name { font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px; }
+    .stage-sub  { font-size: 10px; color: var(--text-sec); }
+    .stage-badge {
+      font-size: 10px; font-weight: 700; color: var(--accent2);
+      background: rgba(0,229,255,0.08); border: 1px solid rgba(0,229,255,0.2);
+      border-radius: 8px; padding: 2px 7px; white-space: nowrap;
+    }
+
+    .pipeline-card,
+    .left-stats,
+    .feature-card,
+    .metric-card,
+    .module-card,
+    .detail-card,
+    .rf-note,
+    .selected-panel,
+    .cluster-legend,
+    .loading-overlay,
+    .radar-card,
+    .candidate-item,
+    .agent-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .pipeline-card { margin: 10px 14px 0; overflow: hidden; }
+    .pipeline-title {
+      font-size: 10px; color: var(--text-dim); letter-spacing: 1.5px;
+      padding: 8px 12px 6px; border-bottom: 1px solid var(--border); text-transform: uppercase;
+    }
+    .pipeline-steps { padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; }
+    .pipeline-step { display: flex; gap: 8px; align-items: flex-start; }
+    .pipeline-step-num {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: rgba(255,224,102,0.12); border: 1px solid rgba(255,224,102,0.28);
+      color: #ffe066; font-size: 10px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .pipeline-step-body { flex: 1; }
+    .pipeline-step-name { font-size: 11px; font-weight: 700; color: var(--text-primary); }
+    .pipeline-step-sub { font-size: 10px; color: var(--text-sec); margin-top: 2px; line-height: 1.45; }
+
+    .left-stats { margin: 10px 14px 0; padding: 10px 12px; }
+    .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+    .stat-row + .stat-row { border-top: 1px solid rgba(255,255,255,0.04); }
+    .stat-label { font-size: 10px; color: var(--text-dim); }
+    .stat-value { font-size: 11px; font-weight: 700; color: var(--accent2); }
+
+    .center-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+    .viz-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .viz-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+    .viz-subtitle { font-size: 10px; color: var(--text-sec); margin-top: 1px; }
+    .viz-controls { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
+    .ctrl-btn {
+      padding: 4px 11px; font-size: 11px; color: var(--text-sec);
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .ctrl-btn:hover, .ctrl-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(0,168,255,0.08); }
+    .viz-wrap { flex: 1; position: relative; overflow: hidden; }
+    .canvas-bg {
+      position: absolute; inset: 0;
+      background-image: radial-gradient(circle at 50% 50%, rgba(0,168,255,0.03) 0%, transparent 70%);
+    }
+    .canvas-grid {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,168,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,168,255,0.025) 1px, transparent 1px);
+      background-size: 48px 48px; pointer-events: none;
+    }
+    #mainCanvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+
+    .cluster-legend {
+      position: absolute; right: 14px; top: 12px;
+      background: rgba(6,20,40,0.88); border-radius: 8px; padding: 10px 13px; backdrop-filter: blur(8px);
+      min-width: 176px;
+    }
+    .cl-title { font-size: 9px; color: var(--text-dim); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 7px; }
+    .cl-item { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+    .cl-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .cl-label { font-size: 10px; color: var(--text-sec); }
+    .cl-count { font-size: 9px; color: var(--text-dim); margin-left: auto; }
+
+    .selected-panel {
+      position: absolute; left: 14px; top: 12px;
+      background: rgba(6,20,40,0.92);
+      padding: 12px 14px; backdrop-filter: blur(8px);
+      width: 244px; display: none;
+    }
+    .selected-panel.visible { display: block; }
+    .sp-title { font-size: 9px; color: var(--text-dim); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+    .sp-name { font-size: 13px; font-weight: 700; color: #ffe066; margin-bottom: 6px; }
+    .sp-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.05); gap: 10px; }
+    .sp-row.multiline { align-items: flex-start; }
+    .sp-key { font-size: 10px; color: var(--text-dim); }
+    .sp-val { font-size: 11px; font-weight: 700; color: var(--text-primary); text-align: right; max-width: 150px; word-break: break-word; }
+    .sp-row.multiline .sp-val { font-size: 10px; font-weight: 500; text-align: left; line-height: 1.45; }
+
+    .zoom-controls {
+      position: absolute; right: 14px; bottom: 14px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .zoom-btn {
+      width: 28px; height: 28px; background: var(--bg-card2);
+      border: 1px solid var(--border); border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: var(--text-sec); cursor: pointer;
+      transition: all 0.15s;
+    }
+    .zoom-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .loading-overlay {
+      position: absolute; inset: 0;
+      background: rgba(3,13,31,0.85);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 50; transition: opacity .4s;
+    }
+    .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+    .loading-spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: #ffe066; border-radius: 50%; animation: spin .8s linear infinite; margin-bottom: 10px; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    .loading-text { font-size: 12px; color: var(--text-sec); }
+    .loading-sub { font-size: 10px; color: var(--text-dim); margin-top: 4px; }
+
+    .right-panel {
+      width: 268px; flex-shrink: 0;
+      background: var(--bg-panel);
+      border-left: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: 14px; gap: 12px; overflow-y: auto;
+    }
+    .rp-section-title {
+      font-size: 10px; font-weight: 700; color: var(--text-dim);
+      letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 7px;
+    }
+    .metric-card { padding: 10px 12px; margin-bottom: 6px; }
+    .metric-label { font-size: 10px; color: var(--text-dim); margin-bottom: 2px; }
+    .metric-value { font-size: 22px; font-weight: 700; color: #ffe066; line-height: 1; }
+    .metric-unit { font-size: 11px; color: var(--text-sec); margin-left: 2px; }
+    .metric-sub { font-size: 10px; color: var(--text-sec); margin-top: 4px; }
+    .metric-good { color: var(--success); }
+    .metric-warn { color: var(--warn); }
+
+    .module-card { padding: 10px 12px; }
+    .module-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .module-name { width: 86px; font-size: 10px; color: var(--text-sec); }
+    .module-bar-wrap { flex: 1; height: 7px; background: rgba(255,255,255,0.07); border-radius: 3px; overflow: hidden; }
+    .module-bar { height: 100%; border-radius: 3px; }
+    .module-val { width: 42px; text-align: right; font-size: 10px; color: var(--text-primary); }
+
+    .feature-card { padding: 10px 12px; }
+    .feature-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 6px; margin-bottom: 6px; cursor: pointer; transition: border-color .2s, transform .2s;
+    }
+    .feature-item:hover, .feature-item.active { border-color: var(--border-glow); transform: translateX(2px); }
+    .feature-rank { font-size: 10px; font-weight: 700; color: var(--text-dim); width: 22px; }
+    .feature-name { flex: 1; min-width: 0; }
+    .feature-title {
+      font-size: 11px; font-weight: 700; color: var(--text-primary);
+      white-space: normal; overflow: hidden; text-overflow: ellipsis;
+      display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical;
+      line-height: 1.25; max-height: 2.5em;
+    }
+    .feature-sub {
+      font-size: 9px; color: var(--text-sec); margin-top: 2px;
+      white-space: normal; overflow: hidden; text-overflow: ellipsis;
+      line-height: 1.3;
+      display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical;
+      max-height: 2.6em;
+    }
+    .feature-score { font-size: 11px; font-weight: 700; color: #ffe066; }
+
+    .bottom-panel {
+      height: 148px; flex-shrink: 0;
+      border-top: 1px solid var(--border);
+      background: var(--bg-panel);
+      display: flex; flex-direction: column;
+      padding: 9px 18px; gap: 7px;
+    }
+    .agent-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .agent-left { display: flex; align-items: center; gap: 10px; }
+    .agent-avatar {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: linear-gradient(135deg, #b06a00, #ffe066);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: #030d1f; flex-shrink: 0;
+    }
+    .agent-name { font-size: 13px; font-weight: 700; color: #ffe066; }
+    .agent-status { font-size: 10px; color: var(--text-dim); }
+    .agent-thinking { display: none; align-items: center; gap: 6px; font-size: 11px; color: var(--text-sec); }
+    .agent-thinking.visible { display: flex; }
+    .think-dots span { display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: #ffe066; animation: bounce 1.2s infinite; }
+    .think-dots span:nth-child(2) { animation-delay: .2s; }
+    .think-dots span:nth-child(3) { animation-delay: .4s; }
+    @keyframes bounce { 0%,80%,100%{transform:translateY(0);opacity:.4} 40%{transform:translateY(-4px);opacity:1} }
+    .preset-prompts { display: flex; gap: 6px; flex-wrap: wrap; }
+    .preset-btn {
+      padding: 4px 10px; background: rgba(255,224,102,0.06);
+      border: 1px solid rgba(255,224,102,0.2); border-radius: 12px;
+      font-size: 10px; color: var(--text-sec); cursor: pointer; transition: all 0.2s; white-space: nowrap;
+    }
+    .preset-btn:hover { background: rgba(255,224,102,0.13); border-color: #ffe066; color: #ffe066; }
+    .chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
+    .chat-msg { display: flex; align-items: flex-start; gap: 8px; animation: fadeIn .3s ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:translateY(0)} }
+    .msg-role { font-size: 10px; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
+    .msg-role.user { color: var(--accent); }
+    .msg-role.agent { color: #ffe066; }
+    .msg-text { font-size: 12px; color: var(--text-primary); line-height: 1.5; }
+    .msg-text .hl { color: #ffe066; font-weight: 700; }
+    .msg-text .tag { display: inline-block; padding: 1px 6px; background: rgba(255,224,102,0.1); border: 1px solid rgba(255,224,102,0.3); border-radius: 3px; font-size: 10px; color: #ffe066; margin: 0 2px; }
+    .msg-text .btag { display: inline-block; padding: 1px 6px; background: rgba(0,168,255,0.1); border: 1px solid rgba(0,168,255,0.3); border-radius: 3px; font-size: 10px; color: var(--accent); margin: 0 2px; }
+    .chat-input-row { display: flex; gap: 8px; align-items: center; }
+    .chat-input-wrap {
+      flex: 1; display: flex; align-items: center;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 7px; padding: 0 12px;
+      transition: border-color .2s;
+    }
+    .chat-input-wrap:focus-within { border-color: #ffe066; }
+    .chat-input { flex: 1; background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 12px; font-family: var(--font); padding: 7px 0; }
+    .chat-input::placeholder { color: var(--text-dim); }
+    .send-btn { padding: 7px 16px; background: linear-gradient(135deg, #b06a00, #ffe066); border: none; border-radius: 7px; color: #030d1f; font-size: 12px; font-weight: 700; cursor: pointer; transition: opacity .2s; white-space: nowrap; }
+    .send-btn:hover { opacity: .85; }
+
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+    @media (max-width: 1180px) {
+      .left-panel { width: 236px; }
+      .right-panel { width: 244px; }
+    }
+    @media (max-width: 980px) {
+      html, body { overflow: auto; }
+      .app { height: auto; min-height: 100vh; }
+      .main { flex-direction: column; overflow: visible; }
+      .left-panel, .right-panel { width: 100%; border: none; border-bottom: 1px solid var(--border); }
+      .right-panel { border-top: 1px solid var(--border); }
+      .center-panel { min-height: 620px; }
+      .bottom-panel { height: auto; min-height: 180px; }
+      .topbar { height: auto; padding: 14px 18px; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+      .topbar-right { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="catl-logo">
+        <svg width="52" height="20" viewBox="0 0 52 20" fill="none">
+          <text x="0" y="15" font-family="Arial Black,sans-serif" font-size="14" font-weight="900" fill="#fff" letter-spacing="1">CATL</text>
+        </svg>
+        <div>
+          <div class="catl-logo-text">宁德时代</div>
+          <div class="catl-logo-sub">CATL · AI for Science</div>
+        </div>
+      </div>
+      <div class="logo-divider"></div>
+      <div>
+        <div class="system-name-main">HKAI-PV</div>
+        <div class="system-name-sub">随机森林钙钛矿钝化剂性能预测界面</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="status-badge"><div class="status-dot"></div>Model Ready</div>
+      <div class="topbar-tag">RandomForest 回归</div>
+      <div class="topbar-tag">Seed = 49</div>
+      <div class="topbar-tag" id="viewTag">预测散点</div>
+    </div>
+  </header>
+
+  <div class="main">
+    <aside class="left-panel">
+      <div class="panel-section-title">建模流程</div>
+      <div class="panel-hint"><div class="hint-dot"></div>点击左侧步骤切换页面说明</div>
+
+      <div id="stageList"></div>
+
+      <div class="pipeline-card">
+        <div class="pipeline-title">特征拼接逻辑</div>
+        <div class="pipeline-steps">
+          <div class="pipeline-step">
+            <div class="pipeline-step-num">1</div>
+            <div class="pipeline-step-body">
+              <div class="pipeline-step-name">Uni-Mol Embedding</div>
+              <div class="pipeline-step-sub">分子结构由 Uni-Mol 编码为 512 维语义向量。</div>
+            </div>
+          </div>
+          <div class="pipeline-step">
+            <div class="pipeline-step-num">2</div>
+            <div class="pipeline-step-body">
+              <div class="pipeline-step-name">DMPNN Embedding</div>
+              <div class="pipeline-step-sub">图神经网络表征钝化剂分子图，取映射后嵌入。</div>
+            </div>
+          </div>
+          <div class="pipeline-step">
+            <div class="pipeline-step-num">3</div>
+            <div class="pipeline-step-body">
+              <div class="pipeline-step-name">Composition Vector</div>
+              <div class="pipeline-step-sub">钙钛矿化学式转为 13 维组分向量，对应 Cs, FA, MA, Rb, DMA, GUA, Pb, Sn, Ge, I, Br, Cl, F。</div>
+            </div>
+          </div>
+          <div class="pipeline-step">
+            <div class="pipeline-step-num">4</div>
+            <div class="pipeline-step-body">
+              <div class="pipeline-step-name">Control PCE</div>
+              <div class="pipeline-step-sub">加入未添加钝化剂时的基线 PCE，用作器件起点信息。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="left-stats">
+        <div class="panel-section-title" style="padding:0 0 6px;border:none;margin:0 0 6px;">实验设置</div>
+        <div class="stat-row"><span class="stat-label">分割随机种子</span><span class="stat-value">49</span></div>
+        <div class="stat-row"><span class="stat-label">训练集样本</span><span class="stat-value">248</span></div>
+        <div class="stat-row"><span class="stat-label">测试集样本</span><span class="stat-value">63</span></div>
+        <div class="stat-row"><span class="stat-label">输入特征总维数</span><span class="stat-value">1040+</span></div>
+        <div class="stat-row"><span class="stat-label">展示重要特征</span><span class="stat-value">Top 19</span></div>
+      </div>
+    </aside>
+
+    <main class="center-panel">
+      <div class="viz-header">
+        <div>
+          <div class="viz-title" id="vizTitle">RandomForest 预测性能总览</div>
+          <div class="viz-subtitle" id="vizSub">基于 notebook 数据处理逻辑构建的假想建模页面，展示 seed=49 下的性能面板与特征重要性</div>
+        </div>
+        <div class="viz-controls">
+          <button class="ctrl-btn" data-view="assembly" onclick="setView('assembly', this)">数据组装</button>
+          <button class="ctrl-btn active" data-view="scatter" onclick="setView('scatter', this)">预测散点</button>
+          <button class="ctrl-btn" data-view="residual" onclick="setView('residual', this)">残差分布</button>
+          <button class="ctrl-btn" data-view="importance" onclick="setView('importance', this)">特征重要性</button>
+        </div>
+      </div>
+
+      <div class="viz-wrap">
+        <div class="canvas-bg"></div>
+        <div class="canvas-grid"></div>
+        <canvas id="mainCanvas"></canvas>
+
+        <div class="cluster-legend" id="legendBox"></div>
+
+        <div class="selected-panel" id="selectedPanel">
+          <div class="sp-title">焦点特征</div>
+          <div class="sp-name" id="spName">pce_control</div>
+          <div id="spProps"></div>
+        </div>
+
+        <div class="zoom-controls">
+          <div class="zoom-btn" onclick="zoom(1.18)" title="放大">+</div>
+          <div class="zoom-btn" onclick="zoom(0.84)" title="缩小">−</div>
+          <div class="zoom-btn" onclick="resetView()" title="重置视图" style="font-size:11px;">⊙</div>
+        </div>
+
+        <div class="loading-overlay" id="vizLoading">
+          <div class="loading-spinner"></div>
+          <div class="loading-text">正在加载 RandomForest 结果面板...</div>
+          <div class="loading-sub">Prediction Scatter · Residual Histogram · Feature Importance</div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="right-panel">
+      <div>
+        <div class="rp-section-title">性能指标</div>
+        <div class="metric-card">
+          <div class="metric-label">测试集 R²</div>
+          <div class="metric-value" id="metricR2">0.89<span class="metric-unit"></span></div>
+          <div class="metric-sub metric-good">seed=49 下随机森林泛化结果</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">测试集 MAE</div>
+          <div class="metric-value" style="font-size:18px;" id="metricMAE">0.86<span class="metric-unit">PCE</span></div>
+          <div class="metric-sub">平均绝对误差</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">测试集 RMSE</div>
+          <div class="metric-value" style="font-size:18px;" id="metricRMSE">1.14<span class="metric-unit">PCE</span></div>
+          <div class="metric-sub metric-warn">更敏感反映偏离点</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="rp-section-title">模块贡献汇总</div>
+        <div class="module-card" id="moduleCard"></div>
+      </div>
+
+      <div>
+        <div class="rp-section-title">Top 特征</div>
+        <div class="feature-card" id="featureList"></div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="bottom-panel">
+    <div class="agent-header">
+      <div class="agent-left">
+        <div class="agent-avatar">RF</div>
+        <div>
+          <div class="agent-name">HKAI-PV RF Agent</div>
+          <div class="agent-status">随机森林解释助手 · 关注基线 PCE、钝化剂结构嵌入与钙钛矿组分</div>
+        </div>
+        <div class="agent-thinking" id="agentThinking">
+          <div class="think-dots"><span></span><span></span><span></span></div>
+          <span id="thinkingText">正在分析特征重要性...</span>
+        </div>
+      </div>
+      <div class="preset-prompts">
+        <div class="preset-btn" onclick="usePreset(this)">🌲 为什么 pce_control 这么重要？</div>
+        <div class="preset-btn" onclick="usePreset(this)">🧪 解释 comp_vals 的物理意义</div>
+        <div class="preset-btn" onclick="usePreset(this)">🔬 DMPNN 和 Uni-Mol 哪个更关键？</div>
+        <div class="preset-btn" onclick="usePreset(this)">📊 怎么理解测试集误差？</div>
+      </div>
+    </div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-input-row">
+      <div class="chat-input-wrap">
+        <span style="font-size:14px;color:var(--text-dim);margin-right:6px;">💬</span>
+        <input class="chat-input" id="chatInput" type="text"
+          placeholder="例如：comp_vals 中 FA 和 I 为什么会进入 Top 特征？"
+          onkeydown="if(event.key==='Enter') sendMessage()" />
+      </div>
+      <button class="send-btn" onclick="sendMessage()">发送 →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ELEMENTS = ['Cs', 'FA', 'MA', 'Rb', 'DMA', 'GUA', 'Pb', 'Sn', 'Ge', 'I', 'Br', 'Cl', 'F'];
+
+const STAGES = [
+  {
+    id: 'data',
+    name: '数据组装',
+    sub: 'SMILES + composition + control PCE',
+    icon: '⛁',
+    color: '#00e5ff',
+    bgColor: 'rgba(0,229,255,0.10)',
+    badge: '1040+'
+  },
+  {
+    id: 'split',
+    name: '数据划分',
+    sub: 'seed = 49 · Train/Test',
+    icon: '⎇',
+    color: '#7b61ff',
+    bgColor: 'rgba(123,97,255,0.10)',
+    badge: '248/63'
+  },
+  {
+    id: 'rf',
+    name: 'RandomForest',
+    sub: 'n_estimators=200 · max_depth=16',
+    icon: '🌲',
+    color: '#ffe066',
+    bgColor: 'rgba(255,224,102,0.12)',
+    badge: 'RF'
+  },
+  {
+    id: 'eval',
+    name: '性能评估',
+    sub: 'R² · MAE · RMSE',
+    icon: '📈',
+    color: '#00e676',
+    bgColor: 'rgba(0,230,118,0.10)',
+    badge: '0.89'
+  },
+  {
+    id: 'feat',
+    name: '特征解释',
+    sub: 'Top 19 importance ranking',
+    icon: '⚙',
+    color: '#ff9500',
+    bgColor: 'rgba(255,149,0,0.10)',
+    badge: 'Top19'
+  }
+];
+
+const FEATURE_IMPORTANCE = [
+  { rank: 1, globalIdx: 1037, module: 'pce_control', localIdx: 0, importance: 0.7954, color: '#ffe066' },
+  { rank: 2, globalIdx: 1025, module: 'comp_vals', localIdx: 1, importance: 0.0041, color: '#00e676' },
+  { rank: 3, globalIdx: 827, module: 'gnn_emb', localIdx: 315, importance: 0.0035, color: '#00e5ff' },
+  { rank: 4, globalIdx: 371, module: 'unimol_emb', localIdx: 371, importance: 0.0033, color: '#7b61ff' },
+  { rank: 5, globalIdx: 870, module: 'gnn_emb', localIdx: 358, importance: 0.0029, color: '#00e5ff' },
+  { rank: 6, globalIdx: 306, module: 'unimol_emb', localIdx: 306, importance: 0.0023, color: '#7b61ff' },
+  { rank: 7, globalIdx: 967, module: 'gnn_emb', localIdx: 455, importance: 0.0022, color: '#00e5ff' },
+  { rank: 8, globalIdx: 139, module: 'unimol_emb', localIdx: 139, importance: 0.0022, color: '#7b61ff' },
+  { rank: 9, globalIdx: 525, module: 'gnn_emb', localIdx: 13, importance: 0.0019, color: '#00e5ff' },
+  { rank: 10, globalIdx: 1026, module: 'comp_vals', localIdx: 2, importance: 0.0019, color: '#00e676' },
+  { rank: 11, globalIdx: 1033, module: 'comp_vals', localIdx: 9, importance: 0.0019, color: '#00e676' },
+  { rank: 12, globalIdx: 860, module: 'gnn_emb', localIdx: 348, importance: 0.0017, color: '#00e5ff' },
+  { rank: 13, globalIdx: 524, module: 'gnn_emb', localIdx: 12, importance: 0.0016, color: '#00e5ff' },
+  { rank: 14, globalIdx: 669, module: 'gnn_emb', localIdx: 157, importance: 0.0016, color: '#00e5ff' },
+  { rank: 15, globalIdx: 416, module: 'unimol_emb', localIdx: 416, importance: 0.0015, color: '#7b61ff' },
+  { rank: 16, globalIdx: 228, module: 'unimol_emb', localIdx: 228, importance: 0.0013, color: '#7b61ff' },
+  { rank: 17, globalIdx: 889, module: 'gnn_emb', localIdx: 377, importance: 0.0013, color: '#00e5ff' },
+  { rank: 18, globalIdx: 1024, module: 'comp_vals', localIdx: 0, importance: 0.0013, color: '#00e676' },
+  { rank: 19, globalIdx: 1006, module: 'gnn_emb', localIdx: 494, importance: 0.0012, color: '#00e5ff' }
+];
+
+function describeFeature(item) {
+  if (item.module === 'gnn_emb') {
+    return {
+      title: `DMPNN embedding 第 ${item.localIdx} 维`,
+      moduleName: '图神经网络嵌入',
+      desc: `由 DMPNN 模型提取的分子图嵌入维度 ${item.localIdx}，用于表征钝化剂结构拓扑、键连接和局部化学环境。`
+    };
+  }
+  if (item.module === 'unimol_emb') {
+    return {
+      title: `Uni-Mol embedding 第 ${item.localIdx} 维`,
+      moduleName: '三维分子嵌入',
+      desc: `由 Uni-Mol 模型提取的分子表示第 ${item.localIdx} 维，强调三维几何、原子环境和全局语义特征。`
+    };
+  }
+  if (item.module === 'pce_control') {
+    return {
+      title: '未添加钝化剂的 PCE 值',
+      moduleName: '基线器件性能',
+      desc: '表示在未加入钝化剂条件下器件的初始 PCE，是模型最强的先验性能信号。'
+    };
+  }
+  const name = ELEMENTS[item.localIdx] || `组分索引 ${item.localIdx}`;
+  return {
+    title: `组分向量 ${name} 占比`,
+    moduleName: '钙钛矿组分向量',
+    desc: `由化学式解析得到的 13 维 composition_vector 中第 ${item.localIdx} 维，对应 ${name} 的化学计量占比。`
+  };
+}
+
+const MODULE_DISPLAY = {
+  pce_control: '未加钝化剂 PCE',
+  comp_vals: '钙钛矿组分向量',
+  gnn_emb: 'DMPNN embedding',
+  unimol_emb: 'Uni-Mol embedding'
+};
+
+const RF_RESP = {
+  pce_control: {
+    think: '正在分析基线性能对随机森林分裂节点的影响...',
+    reply: '从当前结果看，<span class="tag">pce_control</span> 占据压倒性重要度，说明随机森林首先利用未加钝化剂时的器件起点性能来建立预测区间。换句话说，模型先判断这是不是一套本来就具备较高上限的器件，再叠加钝化剂与组分特征做精修正。'
+  },
+  comp_vals: {
+    think: '正在读取 composition_vector 的物理含义...',
+    reply: '这里的 <span class="tag">comp_vals</span> 来自钙钛矿化学式解析。13 个维度分别对应 <span class="btag">Cs, FA, MA, Rb, DMA, GUA, Pb, Sn, Ge, I, Br, Cl, F</span>。Top 排名里出现的 FA、MA、I、Cs 说明 A 位阳离子和卤素组分仍然显著影响钝化剂增益的可实现空间。'
+  },
+  embedding: {
+    think: '正在比较 DMPNN 与 Uni-Mol 嵌入贡献...',
+    reply: '在 Top 19 中，<span class="tag">DMPNN embedding</span> 出现次数更多，说明二维分子图结构特征对随机森林更容易形成稳定划分；<span class="tag">Uni-Mol embedding</span> 也多次进入前列，说明三维构型信息同样在补充结构判别。这个组合更像是“图结构主导，三维语义校正”。'
+  },
+  metric: {
+    think: '正在解释测试集误差指标...',
+    reply: '测试集 <span class="hl">R² = 0.89</span> 表示模型可以解释大部分方差；<span class="hl">MAE = 0.86</span> 说明平均误差控制在 1 个 PCE 点以内；<span class="hl">RMSE = 1.14</span> 略高于 MAE，表示仍存在少量偏差较大的样本点，通常来自特殊组分或 outlier 钝化剂。'
+  }
+};
+
+let currentView = 'scatter';
+let zoomScale = 1;
+let selectedFeature = FEATURE_IMPORTANCE[0];
+let scatterData = [];
+let residualBins = [];
+let hoveredDatum = null;
+let scatterRange = { min: 10, max: 28 };
+const CSV_FILE = 'chemicalbook_pubchem_combined_filtered_smiles_new_old_pce(1).csv';
+const REAL_SCATTER_SAMPLE = [{"observed":19.118322,"predicted":17.11863},{"observed":19.697635,"predicted":17.136244},{"observed":18.394171,"predicted":17.200209},{"observed":18.856354,"predicted":17.131216},{"observed":19.511089,"predicted":17.21229},{"observed":20.035218,"predicted":17.205524},{"observed":19.77889,"predicted":17.23599},{"observed":19.370612,"predicted":17.10529},{"observed":19.83804,"predicted":17.224808},{"observed":19.454605,"predicted":17.334084},{"observed":19.901114,"predicted":17.16421},{"observed":19.414198,"predicted":17.102089},{"observed":19.626483,"predicted":17.145636},{"observed":19.575686,"predicted":17.11075},{"observed":19.687718,"predicted":17.099092},{"observed":20.0684,"predicted":17.238491},{"observed":19.279682,"predicted":17.174942},{"observed":19.06113,"predicted":17.215172},{"observed":19.868028,"predicted":17.194208},{"observed":19.696826,"predicted":17.12712},{"observed":19.604421,"predicted":17.179565},{"observed":19.930732,"predicted":17.174856},{"observed":19.343109,"predicted":17.11364},{"observed":19.32117,"predicted":17.166084},{"observed":19.600476,"predicted":17.131721},{"observed":19.568056,"predicted":17.11658},{"observed":19.755245,"predicted":17.22115},{"observed":19.308594,"predicted":17.230715},{"observed":19.088381,"predicted":17.19699},{"observed":19.714441,"predicted":17.17406},{"observed":19.659892,"predicted":17.173597},{"observed":19.668579,"predicted":17.216831},{"observed":19.444645,"predicted":17.157963},{"observed":20.013792,"predicted":17.294855},{"observed":19.719305,"predicted":17.210663},{"observed":19.165423,"predicted":17.165823},{"observed":19.679972,"predicted":17.319311},{"observed":19.311404,"predicted":17.116318},{"observed":19.103382,"predicted":17.186811},{"observed":19.395198,"predicted":17.225653},{"observed":19.425538,"predicted":17.142155},{"observed":19.864353,"predicted":17.309046},{"observed":19.893947,"predicted":17.214773},{"observed":20.180589,"predicted":17.290194},{"observed":19.764472,"predicted":17.155409},{"observed":19.383261,"predicted":17.107924},{"observed":19.686024,"predicted":17.18391},{"observed":19.277933,"predicted":17.216171},{"observed":19.556948,"predicted":17.20892},{"observed":19.120626,"predicted":17.031067},{"observed":19.872984,"predicted":17.170355},{"observed":19.691447,"predicted":17.202871},{"observed":19.744959,"predicted":17.166294},{"observed":19.487448,"predicted":17.178963},{"observed":19.81378,"predicted":17.171753},{"observed":19.643479,"predicted":17.174551},{"observed":19.893249,"predicted":17.08922},{"observed":19.870906,"predicted":17.291601},{"observed":19.905955,"predicted":17.174852},{"observed":19.19136,"predicted":17.174503},{"observed":19.724706,"predicted":17.163324},{"observed":19.633957,"predicted":17.20615},{"observed":19.368212,"predicted":17.22343},{"observed":19.063741,"predicted":17.20886},{"observed":19.793482,"predicted":17.157675},{"observed":19.756946,"predicted":17.178501},{"observed":19.456824,"predicted":17.173538},{"observed":19.681082,"predicted":17.152754},{"observed":19.583893,"predicted":17.187763},{"observed":19.389924,"predicted":17.209116},{"observed":19.620225,"predicted":17.246311},{"observed":19.078554,"predicted":17.247469},{"observed":19.88162,"predicted":17.158154},{"observed":19.126663,"predicted":17.215643},{"observed":19.666734,"predicted":17.253206},{"observed":19.266435,"predicted":17.1606},{"observed":19.295039,"predicted":17.189886},{"observed":19.544168,"predicted":17.196167},{"observed":19.828749,"predicted":17.139473},{"observed":19.497906,"predicted":17.285664},{"observed":19.117539,"predicted":17.134668},{"observed":19.819415,"predicted":17.221455},{"observed":19.338411,"predicted":17.107883},{"observed":19.586304,"predicted":17.06213},{"observed":19.750891,"predicted":17.333055},{"observed":19.637541,"predicted":17.118639},{"observed":19.68454,"predicted":17.178936},{"observed":19.210306,"predicted":17.175207},{"observed":19.62889,"predicted":17.095718},{"observed":19.758135,"predicted":17.187344},{"observed":19.562351,"predicted":17.291403},{"observed":19.347361,"predicted":17.268812},{"observed":19.50562,"predicted":17.2205},{"observed":19.922332,"predicted":17.266314},{"observed":19.722388,"predicted":16.994953},{"observed":19.373391,"predicted":17.072523},{"observed":19.568743,"predicted":17.196857},{"observed":19.251672,"predicted":17.170042},{"observed":18.840078,"predicted":17.22683},{"observed":19.969157,"predicted":17.250162},{"observed":18.985788,"predicted":17.16467},{"observed":19.716513,"predicted":17.221724},{"observed":19.227946,"predicted":17.081522},{"observed":19.547256,"predicted":17.217575},{"observed":18.870491,"predicted":17.276838},{"observed":19.420603,"predicted":17.080647},{"observed":19.373211,"predicted":17.118176},{"observed":19.337699,"predicted":17.193052},{"observed":19.210193,"predicted":17.188591},{"observed":19.9115,"predicted":17.2497},{"observed":19.697529,"predicted":17.18121},{"observed":19.602264,"predicted":17.176601},{"observed":19.708276,"predicted":17.11514},{"observed":19.60157,"predicted":17.227913},{"observed":19.588708,"predicted":17.217264},{"observed":19.974846,"predicted":17.096498},{"observed":18.191,"predicted":17.099148},{"observed":19.222305,"predicted":17.008862},{"observed":19.4635,"predicted":17.22012},{"observed":19.356439,"predicted":17.163486}];
+
+const mainCanvas = document.getElementById('mainCanvas');
+const mainCtx = mainCanvas.getContext('2d');
+
+function generateFallbackScatterData() {
+  return REAL_SCATTER_SAMPLE.map(item => ({
+    observed: item.observed,
+    predicted: item.predicted,
+    residual: item.predicted - item.observed
+  }));
+}
+
+function parseCsvLine(line) {
+  const parts = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (ch === ',' && !inQuotes) {
+      parts.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  parts.push(current);
+  return parts;
+}
+
+function computeScatterRange(data) {
+  if (!data.length) return { min: 10, max: 28 };
+  const vals = [];
+  data.forEach(d => {
+    vals.push(d.observed, d.predicted);
+  });
+  const minV = Math.min(...vals);
+  const maxV = Math.max(...vals);
+  const pad = Math.max(0.4, (maxV - minV) * 0.08);
+  return { min: minV - pad, max: maxV + pad };
+}
+
+function buildResidualBinsFromData(data) {
+  const edges = [-Infinity, -1.5, -1.0, -0.5, 0, 0.5, 1.0, 1.5, Infinity];
+  const labels = ['< -1.5', '-1.5 ~ -1.0', '-1.0 ~ -0.5', '-0.5 ~ 0', '0 ~ 0.5', '0.5 ~ 1.0', '1.0 ~ 1.5', '> 1.5'];
+  const counts = new Array(8).fill(0);
+  data.forEach(d => {
+    const r = d.residual;
+    for (let i = 0; i < counts.length; i++) {
+      if (r >= edges[i] && r < edges[i + 1]) {
+        counts[i] += 1;
+        break;
+      }
+    }
+  });
+  return labels.map((label, idx) => ({ label, value: counts[idx] }));
+}
+
+async function loadScatterDataFromCsv() {
+  try {
+    const resp = await fetch(CSV_FILE);
+    if (!resp.ok) throw new Error('csv fetch failed');
+    const text = await resp.text();
+    const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+    if (lines.length < 2) throw new Error('csv has no content');
+    const header = parseCsvLine(lines[0]);
+    const oldIdx = header.findIndex(h => h.trim().toLowerCase() === 'old_pce');
+    const newIdx = header.findIndex(h => h.trim().toLowerCase() === 'new_pce');
+    if (oldIdx < 0 || newIdx < 0) throw new Error('old_pce/new_pce not found');
+
+    const parsed = [];
+    const maxRows = 4000;
+    for (let i = 1; i < lines.length && parsed.length < maxRows; i++) {
+      const cols = parseCsvLine(lines[i]);
+      const oldVal = parseFloat(cols[oldIdx]);
+      const newVal = parseFloat(cols[newIdx]);
+      if (Number.isFinite(oldVal) && Number.isFinite(newVal)) {
+        parsed.push({
+          observed: oldVal,
+          predicted: newVal,
+          residual: newVal - oldVal
+        });
+      }
+    }
+    if (parsed.length < 50) throw new Error('too few valid rows');
+
+    const targetN = 520;
+    const step = Math.max(1, Math.floor(parsed.length / targetN));
+    const sampled = [];
+    for (let i = 0; i < parsed.length; i += step) {
+      sampled.push(parsed[i]);
+      if (sampled.length >= targetN) break;
+    }
+    return sampled;
+  } catch (e) {
+    return generateFallbackScatterData();
+  }
+}
+
+function buildStageList() {
+  const container = document.getElementById('stageList');
+  container.innerHTML = '';
+  STAGES.forEach((stage, index) => {
+    const el = document.createElement('div');
+    el.className = 'stage-item' + (index === 0 ? ' active' : '');
+    el.innerHTML = `
+      <div class="stage-color-bar" style="background:${stage.color}"></div>
+      <div class="stage-icon" style="background:${stage.bgColor};color:${stage.color}">${stage.icon}</div>
+      <div class="stage-info">
+        <div class="stage-name">${stage.name}</div>
+        <div class="stage-sub">${stage.sub}</div>
+      </div>
+      <div class="stage-badge">${stage.badge}</div>
+    `;
+    el.onclick = () => activateStage(stage.id, el);
+    container.appendChild(el);
+  });
+}
+
+function activateStage(stageId, el) {
+  document.querySelectorAll('.stage-item').forEach(node => node.classList.remove('active'));
+  el.classList.add('active');
+  if (stageId === 'data') setView('assembly', document.querySelector('[data-view="assembly"]'));
+  if (stageId === 'rf' || stageId === 'eval') setView('scatter', document.querySelector('[data-view="scatter"]'));
+  if (stageId === 'feat') setView('importance', document.querySelector('[data-view="importance"]'));
+  if (stageId === 'split') setView('residual', document.querySelector('[data-view="residual"]'));
+  if (stageId === 'data') showFeature(FEATURE_IMPORTANCE[1]);
+}
+
+function buildModuleCard() {
+  const moduleSum = FEATURE_IMPORTANCE.reduce((acc, item) => {
+    acc[item.module] = (acc[item.module] || 0) + item.importance;
+    return acc;
+  }, {});
+  const maxVal = Math.max(...Object.values(moduleSum));
+  const colors = {
+    pce_control: '#ffe066',
+    comp_vals: '#00e676',
+    gnn_emb: '#00e5ff',
+    unimol_emb: '#7b61ff'
+  };
+  const container = document.getElementById('moduleCard');
+  container.innerHTML = '';
+  Object.entries(moduleSum)
+    .sort((a, b) => b[1] - a[1])
+    .forEach(([key, value]) => {
+      const row = document.createElement('div');
+      row.className = 'module-row';
+      row.innerHTML = `
+        <div class="module-name">${MODULE_DISPLAY[key]}</div>
+        <div class="module-bar-wrap"><div class="module-bar" style="width:${(value / maxVal) * 100}%;background:${colors[key]}"></div></div>
+        <div class="module-val">${value.toFixed(4)}</div>
+      `;
+      container.appendChild(row);
+    });
+}
+
+function buildFeatureList() {
+  const container = document.getElementById('featureList');
+  container.innerHTML = '';
+  FEATURE_IMPORTANCE.forEach(item => {
+    const meta = describeFeature(item);
+    const el = document.createElement('div');
+    el.className = 'feature-item' + (item.rank === 1 ? ' active' : '');
+    el.dataset.rank = item.rank;
+    el.innerHTML = `
+      <div class="feature-rank">#${item.rank}</div>
+      <div class="feature-name">
+        <div class="feature-title">${meta.title}</div>
+        <div class="feature-sub">${MODULE_DISPLAY[item.module]} · Global idx ${item.globalIdx}</div>
+      </div>
+      <div class="feature-score">${item.importance.toFixed(4)}</div>
+    `;
+    el.onclick = () => showFeature(item);
+    container.appendChild(el);
+  });
+}
+
+function showFeature(item) {
+  selectedFeature = item;
+  document.querySelectorAll('.feature-item').forEach(node => node.classList.remove('active'));
+  const active = document.querySelector(`.feature-item[data-rank="${item.rank}"]`);
+  if (active) active.classList.add('active');
+
+  const meta = describeFeature(item);
+  const panel = document.getElementById('selectedPanel');
+  panel.classList.add('visible');
+  document.getElementById('spName').textContent = meta.title;
+  document.getElementById('spProps').innerHTML = `
+    <div class="sp-row"><div class="sp-key">模块</div><div class="sp-val">${MODULE_DISPLAY[item.module]}</div></div>
+    <div class="sp-row"><div class="sp-key">局部维度</div><div class="sp-val">${item.localIdx}</div></div>
+    <div class="sp-row"><div class="sp-key">Global idx</div><div class="sp-val">${item.globalIdx}</div></div>
+    <div class="sp-row"><div class="sp-key">重要度</div><div class="sp-val" style="color:${item.color}">${item.importance.toFixed(4)}</div></div>
+    <div class="sp-row multiline"><div class="sp-key">解释</div><div class="sp-val">${meta.desc}</div></div>
+  `;
+  drawCurrentView();
+}
+
+function buildLegend() {
+  const box = document.getElementById('legendBox');
+  if (currentView === 'assembly') {
+    box.innerHTML = `
+      <div class="cl-title">组装视图</div>
+      <div class="cl-item"><div class="cl-dot" style="background:#00e5ff"></div><div class="cl-label">SMILES 双输入</div><div class="cl-count">SMILES1/2</div></div>
+      <div class="cl-item"><div class="cl-dot" style="background:#00e676"></div><div class="cl-label">composition_vector</div><div class="cl-count">13 维</div></div>
+      <div class="cl-item"><div class="cl-dot" style="background:#ffe066"></div><div class="cl-label">pce_control</div><div class="cl-count">1 维</div></div>
+      <div class="cl-item"><div class="cl-dot" style="background:#7b61ff"></div><div class="cl-label">特征拼接</div><div class="cl-count">X_total</div></div>
+    `;
+    return;
+  }
+  if (currentView === 'scatter') {
+    box.innerHTML = `
+      <div class="cl-title">散点图例</div>
+      <div class="cl-item"><div class="cl-dot" style="background:#ffe066"></div><div class="cl-label">预测点</div><div class="cl-count">${scatterData.length}</div></div>
+      <div class="cl-item"><div class="cl-dot" style="background:#00e5ff"></div><div class="cl-label">y = x 参考线</div><div class="cl-count">ideal</div></div>
+      <div class="cl-item"><div class="cl-dot" style="background:#ff4757"></div><div class="cl-label">高残差样本</div><div class="cl-count">outlier</div></div>
+      <div class="cl-item"><div class="cl-dot" style="background:#00e676"></div><div class="cl-label">数据源</div><div class="cl-count">old_pce/new_pce</div></div>
+    `;
+    return;
+  }
+  if (currentView === 'residual') {
+    box.innerHTML = `
+      <div class="cl-title">残差说明</div>
+      <div class="cl-item"><div class="cl-dot" style="background:#00e676"></div><div class="cl-label">中心区域</div><div class="cl-count">主流样本</div></div>
+      <div class="cl-item"><div class="cl-dot" style="background:#ffd600"></div><div class="cl-label">中等偏差</div><div class="cl-count">需要复查</div></div>
+      <div class="cl-item"><div class="cl-dot" style="background:#ff4757"></div><div class="cl-label">长尾误差</div><div class="cl-count">少量样本</div></div>
+    `;
+    return;
+  }
+  box.innerHTML = `
+    <div class="cl-title">重要度图例</div>
+    <div class="cl-item"><div class="cl-dot" style="background:#ffe066"></div><div class="cl-label">pce_control</div><div class="cl-count">baseline</div></div>
+    <div class="cl-item"><div class="cl-dot" style="background:#00e676"></div><div class="cl-label">comp_vals</div><div class="cl-count">composition</div></div>
+    <div class="cl-item"><div class="cl-dot" style="background:#00e5ff"></div><div class="cl-label">gnn_emb</div><div class="cl-count">DMPNN</div></div>
+    <div class="cl-item"><div class="cl-dot" style="background:#7b61ff"></div><div class="cl-label">unimol_emb</div><div class="cl-count">Uni-Mol</div></div>
+    <div class="cl-item"><div class="cl-dot" style="background:#ff9500"></div><div class="cl-label">当前选中特征</div><div class="cl-count">focus</div></div>
+  `;
+}
+
+function resizeCanvas() {
+  const wrap = mainCanvas.parentElement;
+  mainCanvas.width = wrap.clientWidth * window.devicePixelRatio;
+  mainCanvas.height = wrap.clientHeight * window.devicePixelRatio;
+  mainCanvas.style.width = wrap.clientWidth + 'px';
+  mainCanvas.style.height = wrap.clientHeight + 'px';
+  mainCtx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+  drawCurrentView();
+}
+
+function clearCanvas() {
+  mainCtx.clearRect(0, 0, mainCanvas.clientWidth, mainCanvas.clientHeight);
+}
+
+function drawAxes(bounds, xLabel, yLabel) {
+  const { left, right, top, bottom } = bounds;
+  mainCtx.strokeStyle = 'rgba(0,168,255,0.18)';
+  mainCtx.lineWidth = 1;
+  mainCtx.beginPath();
+  mainCtx.moveTo(left, bottom);
+  mainCtx.lineTo(right, bottom);
+  mainCtx.moveTo(left, top);
+  mainCtx.lineTo(left, bottom);
+  mainCtx.stroke();
+  mainCtx.fillStyle = 'rgba(122,179,212,0.75)';
+  mainCtx.font = '11px sans-serif';
+  mainCtx.fillText(xLabel, right - 45, bottom + 26);
+  mainCtx.save();
+  mainCtx.translate(left - 30, top + 36);
+  mainCtx.rotate(-Math.PI / 2);
+  mainCtx.fillText(yLabel, 0, 0);
+  mainCtx.restore();
+}
+
+function drawAssembly() {
+  clearCanvas();
+  const W = mainCanvas.clientWidth;
+  const H = mainCanvas.clientHeight;
+  const cards = [
+    { x: 70, y: 82, w: 210, h: 92, title: '分子输入', sub: 'SMILES1 + SMILES2\n分子合法性校验', color: '#00e5ff' },
+    { x: 70, y: 228, w: 210, h: 92, title: '结构嵌入', sub: 'Uni-Mol + DMPNN\n得到 embedding 特征', color: '#7b61ff' },
+    { x: 70, y: 374, w: 210, h: 92, title: '器件与组分', sub: 'composition_vector (13)\npce_control + device_structure', color: '#00e676' },
+    { x: 342, y: 156, w: 246, h: 112, title: '特征拼接 X_total', sub: '[embedding_1, embedding_2, comp_vals,\npce_control, device_structure, morgan_fp]', color: '#ffe066' },
+    { x: 342, y: 330, w: 246, h: 112, title: 'Seed = 49 切分', sub: 'Train: 前 248\nTest: 其余样本', color: '#ff9500' },
+    { x: 644, y: 238, w: 224, h: 126, title: 'RandomForest', sub: 'n_estimators=200\nmax_depth=16\n输出预测与重要性', color: '#00a8ff' }
+  ];
+
+  const scale = Math.min(1.05, Math.max(0.75, (W - 40) / 930));
+  mainCtx.save();
+  mainCtx.translate((W - 930 * scale) / 2, (H - 560 * scale) / 2);
+  mainCtx.scale(scale * zoomScale, scale * zoomScale);
+
+  cards.forEach(card => {
+    mainCtx.fillStyle = 'rgba(6,20,40,0.92)';
+    mainCtx.strokeStyle = card.color;
+    mainCtx.lineWidth = 1.4;
+    mainCtx.beginPath();
+    mainCtx.roundRect(card.x, card.y, card.w, card.h, 10);
+    mainCtx.fill();
+    mainCtx.stroke();
+
+    mainCtx.fillStyle = card.color;
+    mainCtx.font = 'bold 14px sans-serif';
+    mainCtx.fillText(card.title, card.x + 12, card.y + 24);
+
+    mainCtx.fillStyle = 'rgba(122,179,212,0.9)';
+    mainCtx.font = '12px sans-serif';
+    const lines = card.sub.split('\n');
+    lines.forEach((line, idx) => {
+      mainCtx.fillText(line, card.x + 12, card.y + 48 + idx * 18);
+    });
+  });
+
+  function arrow(x1, y1, x2, y2, c) {
+    mainCtx.strokeStyle = c;
+    mainCtx.lineWidth = 2;
+    mainCtx.beginPath();
+    mainCtx.moveTo(x1, y1);
+    mainCtx.lineTo(x2, y2);
+    mainCtx.stroke();
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    mainCtx.beginPath();
+    mainCtx.moveTo(x2, y2);
+    mainCtx.lineTo(x2 - 12 * Math.cos(angle - 0.32), y2 - 12 * Math.sin(angle - 0.32));
+    mainCtx.lineTo(x2 - 12 * Math.cos(angle + 0.32), y2 - 12 * Math.sin(angle + 0.32));
+    mainCtx.closePath();
+    mainCtx.fillStyle = c;
+    mainCtx.fill();
+  }
+
+  arrow(280, 128, 342, 208, '#00e5ff');
+  arrow(280, 274, 342, 222, '#7b61ff');
+  arrow(280, 420, 342, 236, '#00e676');
+  arrow(588, 212, 644, 282, '#ffe066');
+  arrow(588, 386, 644, 322, '#ff9500');
+
+  mainCtx.restore();
+
+  mainCtx.fillStyle = 'rgba(122,179,212,0.72)';
+  mainCtx.font = '11px sans-serif';
+  mainCtx.fillText('数据组装视图：从分子输入到特征拼接与随机森林训练入口', 22, 24);
+}
+
+function drawScatter() {
+  clearCanvas();
+  const W = mainCanvas.clientWidth;
+  const H = mainCanvas.clientHeight;
+  const bounds = { left: 70, right: W - 54, top: 40, bottom: H - 60 };
+  drawAxes(bounds, 'Observed PCE', 'Predicted PCE');
+
+  const min = scatterRange.min;
+  const max = scatterRange.max;
+  const scaleX = v => bounds.left + ((v - min) / (max - min)) * (bounds.right - bounds.left) * zoomScale;
+  const scaleY = v => bounds.bottom - ((v - min) / (max - min)) * (bounds.bottom - bounds.top) * zoomScale;
+
+  mainCtx.strokeStyle = 'rgba(0,229,255,0.6)';
+  mainCtx.lineWidth = 1.5;
+  mainCtx.beginPath();
+  mainCtx.moveTo(scaleX(min), scaleY(min));
+  mainCtx.lineTo(scaleX(max), scaleY(max));
+  mainCtx.stroke();
+
+  hoveredDatum = null;
+  scatterData.forEach((point, idx) => {
+    const x = scaleX(point.observed);
+    const y = scaleY(point.predicted);
+    const radius = Math.abs(point.residual) > 1.2 ? 4.8 : 3.0;
+    const color = Math.abs(point.residual) > 1.2 ? '#ff4757' : Math.abs(point.residual) > 0.7 ? '#ffd600' : '#00e676';
+    mainCtx.beginPath();
+    mainCtx.arc(x, y, radius, 0, Math.PI * 2);
+    mainCtx.fillStyle = color;
+    mainCtx.globalAlpha = 0.82;
+    mainCtx.fill();
+    mainCtx.globalAlpha = 1;
+    if (idx % 10 === 0) {
+      mainCtx.strokeStyle = 'rgba(255,255,255,0.35)';
+      mainCtx.lineWidth = 1;
+      mainCtx.stroke();
+    }
+  });
+
+  mainCtx.fillStyle = 'rgba(122,179,212,0.72)';
+  mainCtx.font = '11px sans-serif';
+  mainCtx.fillText('Seed 49 · Scatter from CSV: old_pce (x) vs new_pce (y)', bounds.left, 22);
+}
+
+function drawResidual() {
+  clearCanvas();
+  const W = mainCanvas.clientWidth;
+  const H = mainCanvas.clientHeight;
+  const bounds = { left: 56, right: W - 42, top: 40, bottom: H - 60 };
+  drawAxes(bounds, 'Residual Bin', 'Count');
+
+  const maxCount = Math.max(...residualBins.map(item => item.value));
+  const innerWidth = bounds.right - bounds.left;
+  const barWidth = innerWidth / residualBins.length - 12;
+
+  residualBins.forEach((bin, index) => {
+    const x = bounds.left + index * (innerWidth / residualBins.length) + 6;
+    const height = (bin.value / maxCount) * (bounds.bottom - bounds.top) * zoomScale;
+    const y = bounds.bottom - height;
+    const color = index >= 2 && index <= 5 ? '#00e676' : index === 1 || index === 6 ? '#ffd600' : '#ff4757';
+    mainCtx.fillStyle = color;
+    mainCtx.globalAlpha = 0.82;
+    mainCtx.fillRect(x, y, barWidth, height);
+    mainCtx.globalAlpha = 1;
+    mainCtx.fillStyle = 'rgba(122,179,212,0.72)';
+    mainCtx.font = '9px sans-serif';
+    mainCtx.textAlign = 'center';
+    mainCtx.fillText(bin.label, x + barWidth / 2, bounds.bottom + 16);
+    mainCtx.fillText(bin.value, x + barWidth / 2, y - 8);
+  });
+  mainCtx.textAlign = 'left';
+  mainCtx.fillStyle = 'rgba(122,179,212,0.72)';
+  mainCtx.font = '11px sans-serif';
+  mainCtx.fillText('Residual concentration remains centered around zero', bounds.left, 22);
+}
+
+function drawImportance() {
+  clearCanvas();
+  const W = mainCanvas.clientWidth;
+  const H = mainCanvas.clientHeight;
+  const bounds = { left: 86, right: W - 42, top: 30, bottom: H - 28 };
+  const visible = FEATURE_IMPORTANCE.slice(0, 12);
+  const maxValue = visible[0].importance;
+  const rowGap = (bounds.bottom - bounds.top) / visible.length;
+
+  visible.forEach((item, index) => {
+    const y = bounds.top + index * rowGap + 8;
+    const width = ((item.importance / maxValue) * (bounds.right - bounds.left - 24)) * zoomScale;
+    const meta = describeFeature(item);
+    const isActive = selectedFeature.rank === item.rank;
+
+    mainCtx.fillStyle = isActive ? 'rgba(255,149,0,0.18)' : 'rgba(255,255,255,0.03)';
+    mainCtx.fillRect(bounds.left - 12, y - 4, bounds.right - bounds.left + 12, rowGap - 6);
+    mainCtx.fillStyle = item.color;
+    mainCtx.fillRect(bounds.left, y + 10, width, 12);
+    mainCtx.strokeStyle = isActive ? '#ff9500' : 'rgba(255,255,255,0.06)';
+    mainCtx.lineWidth = 1;
+    mainCtx.strokeRect(bounds.left, y + 10, Math.max(width, 2), 12);
+
+    mainCtx.fillStyle = '#e8f4ff';
+    mainCtx.font = '11px sans-serif';
+    mainCtx.fillText(`#${item.rank} ${meta.title}`, 16, y + 20);
+    mainCtx.fillStyle = 'rgba(122,179,212,0.78)';
+    mainCtx.font = '9px sans-serif';
+    mainCtx.fillText(`${MODULE_DISPLAY[item.module]} · local ${item.localIdx} · global ${item.globalIdx}`, 16, y + 34);
+    mainCtx.fillStyle = isActive ? '#ff9500' : '#ffe066';
+    mainCtx.font = 'bold 10px sans-serif';
+    mainCtx.fillText(item.importance.toFixed(4), Math.min(bounds.left + width + 8, bounds.right - 46), y + 20);
+  });
+
+  mainCtx.fillStyle = 'rgba(122,179,212,0.72)';
+  mainCtx.font = '11px sans-serif';
+  mainCtx.fillText('Top feature importance ranking from RandomForest', 16, 18);
+}
+
+function drawCurrentView() {
+  buildLegend();
+  if (currentView === 'assembly') drawAssembly();
+  else if (currentView === 'scatter') drawScatter();
+  else if (currentView === 'residual') drawResidual();
+  else drawImportance();
+}
+
+function setView(view, btn) {
+  currentView = view;
+  document.querySelectorAll('.ctrl-btn').forEach(node => node.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('viewTag').textContent = view === 'assembly' ? '数据组装' : view === 'scatter' ? '预测散点' : view === 'residual' ? '残差分布' : '特征重要性';
+  document.getElementById('vizTitle').textContent = view === 'scatter'
+    ? 'RandomForest 预测性能总览'
+    : view === 'assembly'
+    ? '数据组装与建模输入结构'
+    : view === 'residual'
+    ? '测试集残差分布'
+    : 'RandomForest 特征重要性排名';
+  document.getElementById('vizSub').textContent = view === 'scatter'
+    ? '直接使用 chemicalbook CSV 中 old_pce/new_pce 的真实数值绘制散点'
+    : view === 'assembly'
+    ? '展示 notebook 数据处理部分如何组装输入特征并送入 RandomForest'
+    : view === 'residual'
+    ? '围绕 0 对称的残差柱状分布，反映模型误差主要集中在中低偏差区间'
+    : '根据用户提供的 Top 19 特征重要性构建，可点击右侧条目查看中文解释';
+  drawCurrentView();
+}
+
+function zoom(factor) {
+  zoomScale = Math.min(1.8, Math.max(0.72, zoomScale * factor));
+  drawCurrentView();
+}
+
+function resetView() {
+  zoomScale = 1;
+  drawCurrentView();
+}
+
+function getResp(text) {
+  if (text.includes('pce_control') || text.includes('基线') || text.includes('未添加钝化剂')) return RF_RESP.pce_control;
+  if (text.includes('comp_vals') || text.includes('组分') || text.includes('FA') || text.includes('MA') || text.includes('I')) return RF_RESP.comp_vals;
+  if (text.includes('DMPNN') || text.includes('Uni-Mol') || text.includes('embedding')) return RF_RESP.embedding;
+  if (text.includes('误差') || text.includes('R2') || text.includes('MAE') || text.includes('RMSE')) return RF_RESP.metric;
+  return {
+    think: '正在整理当前随机森林页面信息...',
+    reply: '当前页面聚焦 <span class="tag">RandomForest</span> 假想结果展示：左侧是 notebook 对应的数据处理流程，中间可切换 <span class="btag">预测散点 / 残差分布 / 特征重要性</span>，右侧给出 seed=49 下的核心指标和 Top 特征列表。您可以继续追问某个特征或某类模块的含义。'
+  };
+}
+
+function typewrite(role, html) {
+  const container = document.getElementById('chatMessages');
+  const msg = document.createElement('div');
+  msg.className = 'chat-msg';
+  const roleEl = document.createElement('span');
+  roleEl.className = `msg-role ${role}`;
+  roleEl.textContent = role === 'user' ? '用户' : 'Agent';
+  const textEl = document.createElement('span');
+  textEl.className = 'msg-text';
+  msg.appendChild(roleEl);
+  msg.appendChild(textEl);
+  container.appendChild(msg);
+  const plain = html.replace(/<[^>]+>/g, '');
+  let i = 0;
+  const timer = setInterval(() => {
+    i += 4;
+    if (i >= plain.length) {
+      clearInterval(timer);
+      textEl.innerHTML = html;
+    } else {
+      textEl.textContent = plain.slice(0, i);
+    }
+    container.scrollTop = container.scrollHeight;
+  }, 16);
+}
+
+function addMsg(role, html) {
+  const container = document.getElementById('chatMessages');
+  const msg = document.createElement('div');
+  msg.className = 'chat-msg';
+  msg.innerHTML = `<span class="msg-role ${role}">${role === 'user' ? '用户' : 'Agent'}</span><span class="msg-text">${html}</span>`;
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+}
+
+function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  addMsg('user', text);
+  const resp = getResp(text);
+  const thinking = document.getElementById('agentThinking');
+  document.getElementById('thinkingText').textContent = resp.think;
+  thinking.classList.add('visible');
+  setTimeout(() => {
+    thinking.classList.remove('visible');
+    typewrite('agent', resp.reply);
+  }, 1100);
+}
+
+function usePreset(btn) {
+  const text = btn.textContent.replace(/^[^\s]+\s/, '');
+  document.getElementById('chatInput').value = text;
+  sendMessage();
+}
+
+window.addEventListener('resize', resizeCanvas);
+
+async function init() {
+  scatterData = await loadScatterDataFromCsv();
+  scatterRange = computeScatterRange(scatterData);
+  residualBins = buildResidualBinsFromData(scatterData);
+  buildStageList();
+  buildModuleCard();
+  buildFeatureList();
+  resizeCanvas();
+  showFeature(FEATURE_IMPORTANCE[0]);
+  setView('scatter', document.querySelector('[data-view="scatter"]'));
+  document.getElementById('vizLoading').classList.add('hidden');
+  setTimeout(() => {
+    typewrite('agent', '您好！这里展示的是 <span class="hl">HKAI-PV RandomForest</span> 结果页。页面沿用了原始 fake 网页的视觉风格，但核心内容切换为 <span class="tag">seed=49</span> 的随机森林性能表现、残差分布和特征重要性解释。右侧可直接点击 Top 特征查看中文释义。');
+  }, 600);
+}
+
+init();
+</script>
+</body>
+</html>
